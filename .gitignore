@@ -1,0 +1,8 @@
+logs
+**/_ */
+**/.vscode
+**/.idea
+**/.DS_Store
+**/.env
+**/.cursorrules
+**/__pycache__/*

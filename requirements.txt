@@ -1,0 +1,7 @@
+tensorflow[and-cuda]==2.19.0
+tensorflowjs==4.22.0
+matplotlib
+tqdm
+opencv-python
+scikit-image
+scikit-learn

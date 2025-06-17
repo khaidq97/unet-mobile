@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nail Segmentation - TensorFlow.js Demo</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            padding: 30px;
+            text-align: center;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            font-weight: 400;
+        }
+
+        .model-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .control-group {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px dashed #ddd;
+        }
+
+        .control-group.loaded {
+            border-color: #28a745;
+            background: #d4edda;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .file-input {
+            margin: 10px 0;
+        }
+
+        .file-input input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            background: white;
+        }
+
+        .slider-group {
+            margin: 15px 0;
+        }
+
+        .slider-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .slider-group input[type="range"] {
+            width: 100%;
+            margin: 5px 0;
+        }
+
+        .slider-value {
+            background: #e9ecef;
+            padding: 5px 10px;
+            border-radius: 4px;
+            display: inline-block;
+            min-width: 50px;
+            text-align: center;
+            font-family: monospace;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: 500;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .results {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        .result-card {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid #e9ecef;
+        }
+
+        .result-card h3 {
+            margin-bottom: 15px;
+            color: #495057;
+        }
+
+        .canvas-container {
+            position: relative;
+            display: inline-block;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        canvas, img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .metric {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #e9ecef;
+        }
+
+        .metric-value {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .metric-label {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        @media (max-width: 768px) {
+            .model-controls {
+                grid-template-columns: 1fr;
+            }
+            
+            .results {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 Nail Segmentation</h1>
+            <p>AI-powered nail detection using TensorFlow.js</p>
+        </div>
+
+        <div class="content">
+            <!-- Model Loading Section -->
+            <div class="section">
+                <h2>📦 Model Setup</h2>
+                <div class="model-controls">
+                    <div class="control-group" id="modelGroup">
+                        <h3>🔧 Load Model</h3>
+                        <div class="file-input">
+                            <input type="file" id="modelFileInput" multiple accept=".json,.bin" 
+                                   style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 8px; background: white; margin: 10px 0;">
+                        </div>
+                        <div style="font-size: 12px; color: #6c757d; margin-bottom: 10px;">
+                            Select model.json and all weight files (.bin)
+                        </div>
+                        <div id="selectedFiles" style="margin: 10px 0; display: none;"></div>
+                        <button class="btn" id="loadModelBtn" disabled>Load Model</button>
+                        <div id="modelStatus" class="status info" style="display: none;">Model not loaded</div>
+                    </div>
+
+                    <div class="control-group">
+                        <h3>📊 Model Info</h3>
+                        <div id="modelInfo">
+                            <p><strong>Status:</strong> <span id="modelStatusText">Not loaded</span></p>
+                            <p><strong>Input Shape:</strong> <span id="inputShape">-</span></p>
+                            <p><strong>Output Shape:</strong> <span id="outputShape">-</span></p>
+                            <p><strong>Parameters:</strong> <span id="modelParams">-</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Image Upload Section -->
+            <div class="section">
+                <h2>🖼️ Image Processing</h2>
+                <div class="control-group">
+                    <h3>📁 Upload Image</h3>
+                    <div class="file-input">
+                        <input type="file" id="imageInput" accept="image/*">
+                    </div>
+                    
+                    <div class="slider-group">
+                        <label for="thresholdSlider">Threshold: <span class="slider-value" id="thresholdValue">0.5</span></label>
+                        <input type="range" id="thresholdSlider" min="0" max="1" step="0.01" value="0.5">
+                    </div>
+                    
+                    <button class="btn" id="predictBtn" disabled>🎯 Run Prediction</button>
+                </div>
+            </div>
+
+            <!-- Loading Indicator -->
+            <div class="loading" id="loadingIndicator">
+                <div class="spinner"></div>
+                <p>Processing image...</p>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <div class="section">
+                <h2>📈 Results</h2>
+                <div class="results" id="resultsContainer" style="display: none;">
+                    <div class="result-card">
+                        <h3>Original Image</h3>
+                        <div class="canvas-container">
+                            <img id="originalImage" alt="Original">
+                        </div>
+                    </div>
+
+                    <div class="result-card">
+                        <h3>Predicted Mask</h3>
+                        <div class="canvas-container">
+                            <canvas id="maskCanvas" width="256" height="256"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="result-card">
+                        <h3>Overlay Result</h3>
+                        <div class="canvas-container">
+                            <canvas id="overlayCanvas" width="256" height="256"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metrics" id="metricsContainer" style="display: none;">
+                    <div class="metric">
+                        <div class="metric-value" id="inferenceTime">-</div>
+                        <div class="metric-label">Inference Time (ms)</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="confidence">-</div>
+                        <div class="metric-label">Confidence</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="maskArea">-</div>
+                        <div class="metric-label">Mask Area (%)</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="resolution">-</div>
+                        <div class="metric-label">Resolution</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class NailSegmentation {
+            constructor() {
+                this.model = null;
+                this.inputShape = [64, 64, 3];
+                this.isModelLoaded = false;
+            }
+
+            async loadModel(modelPath) {
+                try {
+                    console.log('Loading model from:', modelPath);
+                    
+                    // Try loading as GraphModel first (for SavedModel exports)
+                    try {
+                        this.model = await tf.loadGraphModel(modelPath);
+                        this.modelType = 'graph';
+                        console.log('✅ Model loaded as GraphModel');
+                    } catch (graphError) {
+                        console.log('GraphModel failed, trying LayersModel...');
+                        this.model = await tf.loadLayersModel(modelPath);
+                        this.modelType = 'layers';
+                        console.log('✅ Model loaded as LayersModel');
+                    }
+                    
+                    this.isModelLoaded = true;
+                    
+                    // Get model info based on type
+                    let inputShape, outputShape, params;
+                    
+                    if (this.modelType === 'graph') {
+                        // GraphModel doesn't have inputs/outputs arrays
+                        inputShape = this.model.modelSignature?.inputs ? 
+                            Object.values(this.model.modelSignature.inputs)[0].tensorShape.dim.map(d => d.size) :
+                            [null, 64, 64, 3]; // Default shape
+                        outputShape = this.model.modelSignature?.outputs ?
+                            Object.values(this.model.modelSignature.outputs)[0].tensorShape.dim.map(d => d.size) :
+                            [null, 64, 64, 1]; // Default shape
+                        params = 'N/A (GraphModel)';
+                    } else {
+                        // LayersModel
+                        inputShape = this.model.inputs[0].shape;
+                        outputShape = this.model.outputs[0].shape;
+                        params = this.model.countParams();
+                    }
+                    
+                    console.log('📐 Input shape:', inputShape);
+                    console.log('📐 Output shape:', outputShape);
+                    
+                    return {
+                        success: true,
+                        inputShape: inputShape,
+                        outputShape: outputShape,
+                        params: params,
+                        modelType: this.modelType
+                    };
+                } catch (error) {
+                    console.error('❌ Error loading model:', error);
+                    this.isModelLoaded = false;
+                    throw error;
+                }
+            }
+
+            preprocessImage(imageElement) {
+                return tf.tidy(() => {
+                    // Convert image to tensor
+                    let tensor = tf.browser.fromPixels(imageElement, 3);
+                    
+                    // Resize to model input size
+                    tensor = tf.image.resizeBilinear(tensor, [64, 64]);
+                    
+                    // Normalize to [0, 1]
+                    tensor = tensor.div(255.0);
+                    
+                    // Standardize with ImageNet statistics
+                    const mean = tf.tensor([0.485, 0.456, 0.406]);
+                    const std = tf.tensor([0.229, 0.224, 0.225]);
+                    tensor = tensor.sub(mean).div(std);
+                    
+                    // Add batch dimension
+                    tensor = tensor.expandDims(0);
+                    
+                    return tensor;
+                });
+            }
+
+            async predict(imageElement, threshold = 0.5) {
+                if (!this.isModelLoaded) {
+                    throw new Error('Model not loaded');
+                }
+
+                const startTime = performance.now();
+                const preprocessed = this.preprocessImage(imageElement);
+
+                try {
+                    // Run inference
+                    const prediction = this.model.predict(preprocessed);
+                    
+                    // Get prediction data
+                    const predictionData = await prediction.data();
+                    const inferenceTime = performance.now() - startTime;
+                    
+                    // Apply threshold for binary mask
+                    const maskData = new Uint8Array(predictionData.length);
+                    let positivePixels = 0;
+                    let totalConfidence = 0;
+                    
+                    for (let i = 0; i < predictionData.length; i++) {
+                        const value = predictionData[i];
+                        maskData[i] = value > threshold ? 255 : 0;
+                        if (value > threshold) positivePixels++;
+                        totalConfidence += value;
+                    }
+                    
+                    const confidence = totalConfidence / predictionData.length;
+                    const maskArea = (positivePixels / predictionData.length) * 100;
+
+                    // Cleanup tensors
+                    preprocessed.dispose();
+                    prediction.dispose();
+
+                    return {
+                        maskData: maskData,
+                        confidence: confidence,
+                        inferenceTime: inferenceTime,
+                        maskArea: maskArea,
+                        shape: [64, 64]
+                    };
+
+                } catch (error) {
+                    preprocessed.dispose();
+                    throw error;
+                }
+            }
+
+            visualizeMask(maskData, canvas, colorMode = 'red') {
+                const ctx = canvas.getContext('2d');
+                const imageData = ctx.createImageData(64, 64);
+                
+                for (let i = 0; i < maskData.length; i++) {
+                    const pixelIndex = i * 4;
+                    const value = maskData[i];
+                    
+                    if (colorMode === 'red') {
+                        imageData.data[pixelIndex] = value;     // R
+                        imageData.data[pixelIndex + 1] = 0;     // G
+                        imageData.data[pixelIndex + 2] = 0;     // B
+                        imageData.data[pixelIndex + 3] = value; // A
+                    } else {
+                        // Grayscale
+                        imageData.data[pixelIndex] = value;     // R
+                        imageData.data[pixelIndex + 1] = value; // G
+                        imageData.data[pixelIndex + 2] = value; // B
+                        imageData.data[pixelIndex + 3] = 255;   // A
+                    }
+                }
+                
+                ctx.putImageData(imageData, 0, 0);
+            }
+
+            createOverlay(originalImage, maskData, overlayCanvas) {
+                const ctx = overlayCanvas.getContext('2d');
+                
+                // Clear canvas
+                ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+                
+                // Draw original image first
+                ctx.drawImage(originalImage, 0, 0, overlayCanvas.width, overlayCanvas.height);
+                
+                // Create mask overlay with better blending
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.fillStyle = 'rgba(255, 0, 0, 0.4)'; // Semi-transparent red
+                
+                // Draw mask overlay pixel by pixel
+                const pixelSize = overlayCanvas.width / 64; // Scale factor for display
+                
+                for (let y = 0; y < 64; y++) {
+                    for (let x = 0; x < 64; x++) {
+                        const i = y * 64 + x;
+                        const maskValue = maskData[i];
+                        
+                        if (maskValue > 0) {
+                            const opacity = maskValue / 255 * 0.5; // Adjust opacity based on mask value
+                            ctx.fillStyle = `rgba(255, 0, 0, ${opacity})`;
+                            ctx.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+                        }
+                    }
+                }
+                
+                // Reset composite operation
+                ctx.globalCompositeOperation = 'source-over';
+            }
+        }
+
+        // Initialize the application
+        const segmenter = new NailSegmentation();
+        let currentImage = null;
+
+        // DOM elements
+        const modelFileInput = document.getElementById('modelFileInput');
+        const selectedFiles = document.getElementById('selectedFiles');
+        const loadModelBtn = document.getElementById('loadModelBtn');
+        const modelStatus = document.getElementById('modelStatus');
+        const modelGroup = document.getElementById('modelGroup');
+        const imageInput = document.getElementById('imageInput');
+        const predictBtn = document.getElementById('predictBtn');
+        const thresholdSlider = document.getElementById('thresholdSlider');
+        const thresholdValue = document.getElementById('thresholdValue');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const metricsContainer = document.getElementById('metricsContainer');
+
+        // Keep track of selected model files
+        let selectedModelFiles = null;
+
+        // Update threshold value display
+        thresholdSlider.addEventListener('input', (e) => {
+            thresholdValue.textContent = e.target.value;
+        });
+
+        // Handle model files selection (multiple files)
+        modelFileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            if (files.length > 0) {
+                selectedModelFiles = files;
+                
+                // Show selected files
+                const fileList = files.map(f => f.name).join(', ');
+                selectedFiles.innerHTML = `
+                    <div style="padding: 8px; background: #f8f9fa; border-radius: 4px; font-family: monospace; font-size: 12px; color: #6c757d;">
+                        <strong>Selected files:</strong><br>
+                        ${files.map(f => `• ${f.name}`).join('<br>')}
+                    </div>
+                `;
+                selectedFiles.style.display = 'block';
+                
+                // Enable load button
+                loadModelBtn.disabled = false;
+                
+                showStatus(`${files.length} files selected`, 'info');
+            } else {
+                selectedModelFiles = null;
+                selectedFiles.style.display = 'none';
+                loadModelBtn.disabled = true;
+            }
+        });
+
+        // Load model from uploaded files
+        loadModelBtn.addEventListener('click', async () => {
+            if (!selectedModelFiles || selectedModelFiles.length === 0) {
+                showStatus('Please select model files first', 'error');
+                return;
+            }
+
+            loadModelBtn.disabled = true;
+            loadModelBtn.textContent = 'Loading...';
+
+            try {
+                // Find model.json file
+                const modelJsonFile = selectedModelFiles.find(f => f.name.endsWith('.json'));
+                if (!modelJsonFile) {
+                    throw new Error('No model.json file found in selection');
+                }
+
+                // Create object URLs for all files
+                const fileUrls = {};
+                selectedModelFiles.forEach(file => {
+                    fileUrls[file.name] = URL.createObjectURL(file);
+                });
+
+                // Modify the model loading to handle file URLs
+                const modelUrl = fileUrls[modelJsonFile.name];
+                
+                // Create a custom fetch function that resolves weight files
+                const originalFetch = window.fetch;
+                window.fetch = function(url, options) {
+                    // If it's a weight file request, use our object URL
+                    const fileName = url.split('/').pop();
+                    if (fileUrls[fileName]) {
+                        return originalFetch(fileUrls[fileName], options);
+                    }
+                    return originalFetch(url, options);
+                };
+
+                const result = await segmenter.loadModel(modelUrl);
+                
+                // Restore original fetch
+                window.fetch = originalFetch;
+                
+                // Clean up all object URLs
+                Object.values(fileUrls).forEach(url => URL.revokeObjectURL(url));
+                
+                // Update UI
+                modelGroup.classList.add('loaded');
+                document.getElementById('modelStatusText').textContent = 'Loaded ✅';
+                document.getElementById('inputShape').textContent = JSON.stringify(result.inputShape);
+                document.getElementById('outputShape').textContent = JSON.stringify(result.outputShape);
+                document.getElementById('modelParams').textContent = result.params.toLocaleString();
+                updatePredictButton();
+                
+                showStatus('Model loaded successfully!', 'success');
+                
+            } catch (error) {
+                showStatus(`Failed to load model: ${error.message}`, 'error');
+            } finally {
+                loadModelBtn.disabled = true; // Keep disabled until new files are selected
+                loadModelBtn.textContent = 'Load Model';
+            }
+        });
+
+        // Handle image upload
+        imageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        currentImage = img;
+                        document.getElementById('originalImage').src = e.target.result;
+                        updatePredictButton();
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Run prediction
+        predictBtn.addEventListener('click', async () => {
+            if (!currentImage || !segmenter.isModelLoaded) return;
+
+            // Show loading
+            loadingIndicator.classList.add('active');
+            resultsContainer.style.display = 'none';
+            metricsContainer.style.display = 'none';
+            predictBtn.disabled = true;
+
+            // Simulate progress
+            const progressFill = document.getElementById('progressFill');
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += 10;
+                progressFill.style.width = progress + '%';
+                if (progress >= 90) clearInterval(progressInterval);
+            }, 50);
+
+            try {
+                const threshold = parseFloat(thresholdSlider.value);
+                const result = await segmenter.predict(currentImage, threshold);
+
+                // Complete progress
+                progressFill.style.width = '100%';
+
+                // Visualize results
+                const maskCanvas = document.getElementById('maskCanvas');
+                const overlayCanvas = document.getElementById('overlayCanvas');
+
+                // Resize canvases to display size
+                const displaySize = 256;
+                maskCanvas.width = displaySize;
+                maskCanvas.height = displaySize;
+                overlayCanvas.width = displaySize;
+                overlayCanvas.height = displaySize;
+
+                // Draw mask (upscaled)
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = 64;
+                tempCanvas.height = 64;
+                segmenter.visualizeMask(result.maskData, tempCanvas);
+                
+                const maskCtx = maskCanvas.getContext('2d');
+                maskCtx.imageSmoothingEnabled = false;
+                maskCtx.drawImage(tempCanvas, 0, 0, displaySize, displaySize);
+
+                // Create overlay directly on the display canvas
+                segmenter.createOverlay(currentImage, result.maskData, overlayCanvas);
+
+                // Update metrics
+                document.getElementById('inferenceTime').textContent = Math.round(result.inferenceTime);
+                document.getElementById('confidence').textContent = result.confidence.toFixed(3);
+                document.getElementById('maskArea').textContent = result.maskArea.toFixed(1);
+                document.getElementById('resolution').textContent = result.shape.join(' × ');
+
+                // Show results
+                resultsContainer.style.display = 'grid';
+                metricsContainer.style.display = 'grid';
+
+            } catch (error) {
+                showStatus(`Prediction failed: ${error.message}`, 'error');
+            } finally {
+                // Hide loading
+                loadingIndicator.classList.remove('active');
+                progressFill.style.width = '0%';
+                predictBtn.disabled = false;
+            }
+        });
+
+        function updatePredictButton() {
+            predictBtn.disabled = !(currentImage && segmenter.isModelLoaded);
+        }
+
+        function showStatus(message, type) {
+            modelStatus.textContent = message;
+            modelStatus.className = `status ${type}`;
+            modelStatus.style.display = 'block';
+            
+            setTimeout(() => {
+                modelStatus.style.display = 'none';
+            }, 5000);
+        }
+
+        // Initialize
+        console.log('🚀 Nail Segmentation Demo Ready!');
+        console.log('📋 Instructions:');
+        console.log('1. Load your TensorFlow.js model');
+        console.log('2. Upload an image');
+        console.log('3. Adjust threshold if needed');
+        console.log('4. Run prediction');
+    </script>
+</body>
+</html> 

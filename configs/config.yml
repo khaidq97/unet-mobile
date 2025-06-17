@@ -1,0 +1,95 @@
+model:
+  name: unet_nano # unet_nano, unet_micro
+  num_classes: 1
+  input_shape: [64, 64, 3] # 112x112x3
+  pretrained: null
+
+data:
+  extensions:
+    - jpg
+    - jpeg
+    - png
+    - bmp
+    - tiff
+  dataset_path:
+    - ./assets/dataset/thaivv
+    - ./assets/dataset/sample
+  image_dir: images
+  mask_dir: masks
+  train_split: 0.8
+  val_split: 0.2
+  test_split: 0.0
+  batch_size: 32
+  num_workers: 4
+  shuffle: true
+  normalize: true
+  mean: [0.485, 0.456, 0.406]
+  std: [0.229, 0.224, 0.225]
+
+augmentation:
+  enable: true
+  horizontal_flip: 
+    enable: true
+    probability: 0.5
+  vertical_flip: 
+    enable: false
+    probability: 0.2
+  rotation: 
+    enable: true
+    probability: 0.3
+    limit: 15
+  brightness: 
+    enable: true
+    probability: 0.4
+    limit: 0.15
+  contrast: 
+    enable: true
+    probability: 0.4
+    limit: 0.2
+  saturation: 
+    enable: true
+    probability: 0.3
+    limit: 0.2
+  hue: 
+    enable: true
+    probability: 0.2
+    limit: 0.05
+  noise: 
+    enable: true
+    probability: 0.3
+    limit: 0.01
+  zoom:
+    enable: true
+    probability: 0.2
+    limit: 0.01
+
+training:
+  log_dir: logs/unet-nano
+  epochs: 1000
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  optimizer: adam # adam, sgd
+  momentum: 0.9
+  loss_function: combined # dice, focal, combined, tversky, iou, bce
+  mixed_precision: true
+  model_checkpoint:
+    enable: true
+    monitor: val_iou
+    mode: max
+    save_best_only: true
+    save_weights_only: false
+    verbose: 1
+  early_stopping:
+    enable: false
+    monitor: val_iou
+    mode: max
+    patience: 100
+    restore_best_weights: true
+    verbose: 1
+  learning_rate_reduction:
+    enable: true
+    factor: 0.5
+    patience: 10
+    min_lr: 0.000001
+
+seed: 42 
